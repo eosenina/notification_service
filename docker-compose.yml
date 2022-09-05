@@ -1,0 +1,99 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:latest
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: username
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: notification_service
+    volumes:
+      - ./data-postgres:/var/lib/postgresql/data
+    networks:
+      - backend
+  rabbitmq:
+    image: rabbitmq:3.9.22-management
+    container_name: rabbitmq
+    hostname: 'rabbitmq'
+    restart: always
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - ./data-rabbitmq:/var/lib/rabbitmq
+    networks:
+      - backend
+  celery:
+    restart: always
+    build: .
+    command: celery --app=notification_service worker --loglevel=info --statedb=/main/data-celery/state
+    volumes:
+      - ./data-celery:/main/data-celery
+    environment:
+      CELERY_BROKER: pyamqp://rabbitmq
+      DB_USER: 'username'
+      DB_PASSWORD: 'password'
+      DB_PORT: ''
+      DB_HOST: 'postgres'
+      AUTH_TOKEN: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTMzODUyMjUsImlzcyI6ImZhYnJpcXVlIiwibmFtZSI6ImVrYXRlcm9zIn0.3CFK0tvevHgGyXFkubd778f1iwJSpVc1b-zCtjIU3Po'
+      MESSAGE_GATEWAY_URL: 'https://probe.fbrq.cloud/'
+    depends_on:
+      - rabbitmq
+      - main
+    networks:
+      - backend
+  celery-beat:
+    restart: always
+    build: .
+    command: celery --app=notification_service beat --loglevel=debug
+    environment:
+      CELERY_BROKER: pyamqp://rabbitmq
+      DB_USER: 'username'
+      DB_PASSWORD: 'password'
+      DB_PORT: ''
+      DB_HOST: 'postgres'
+      AUTH_TOKEN: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTMzODUyMjUsImlzcyI6ImZhYnJpcXVlIiwibmFtZSI6ImVrYXRlcm9zIn0.3CFK0tvevHgGyXFkubd778f1iwJSpVc1b-zCtjIU3Po'
+      MESSAGE_GATEWAY_URL: 'https://probe.fbrq.cloud/'
+    depends_on:
+      - celery
+    networks:
+      - backend
+  flower:
+    build: .
+    command: celery --app=notification_service flower --loglevel=info
+    ports:
+      - 5555:5555
+    environment:
+      CELERY_BROKER: pyamqp://rabbitmq
+    depends_on:
+      - celery
+    networks:
+      - backend
+  main:
+    build: .
+    container_name: main
+    restart: always
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py fill_message_statuses &&
+             python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - 8000:8000
+    environment:
+      CELERY_BROKER: pyamqp://rabbitmq
+      DB_USER: 'username'
+      DB_PASSWORD: 'password'
+      DB_PORT: ''
+      DB_HOST: 'postgres'
+      AUTH_TOKEN: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2OTMzODUyMjUsImlzcyI6ImZhYnJpcXVlIiwibmFtZSI6ImVrYXRlcm9zIn0.3CFK0tvevHgGyXFkubd778f1iwJSpVc1b-zCtjIU3Po'
+      MESSAGE_GATEWAY_URL: 'https://probe.fbrq.cloud/'
+    depends_on:
+      - postgres
+    networks:
+      - default
+      - backend
+networks:
+  default:
+  backend:

@@ -1,0 +1,1 @@
+[{"model": "mailing_list.messagestatus", "pk": 1, "fields": {"name": "created"}}, {"model": "mailing_list.messagestatus", "pk": 2, "fields": {"name": "sent"}}, {"model": "mailing_list.messagestatus", "pk": 3, "fields": {"name": "canceled"}}, {"model": "mailing_list.messagestatus", "pk": 4, "fields": {"name": "error"}}]
